@@ -1,0 +1,404 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  seller
+  buyer
+}
+enum AdminRole {
+  super_admin
+  helpdesk
+}
+enum VerificationStatus {
+  pending
+  approved
+  rejected
+  suspended
+}
+enum DemandStatus {
+  open
+  partially_filled
+  fulfilled
+  expired
+  cancelled
+}
+enum OrderStatus {
+  committed
+  delivered
+  confirmed
+  paid
+  expired
+  cancelled
+  disputed
+}
+enum TransactionType {
+  topup
+  lock
+  unlock
+  debit
+  credit
+  commission
+  withdrawal
+  refund
+}
+enum TransactionStatus {
+  pending
+  completed
+  failed
+  reversed
+}
+enum TicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+model User {
+  id                    String             @id @default(uuid()) @db.Uuid
+  phone                 String             @unique @db.VarChar(15)
+  fullName              String             @map("full_name") @db.VarChar(100)
+  role                  UserRole
+  region                String             @default("Dodoma") @db.VarChar(50)
+  district              String?            @db.VarChar(50)
+  ward                  String?            @db.VarChar(50)
+  village               String?            @db.VarChar(100)
+  isActive              Boolean            @default(true) @map("is_active")
+  isVerified            Boolean            @default(false) @map("is_verified")
+  verificationStatus    VerificationStatus @default(pending) @map("verification_status")
+  verifiedBy            String?            @map("verified_by") @db.Uuid
+  verifiedAt            DateTime?          @map("verified_at")
+  rejectionReason       String?            @map("rejection_reason")
+  rating                Decimal            @default(5) @db.Decimal(3, 2)
+  totalRatings          Int                @default(0) @map("total_ratings")
+  isDisqualified        Boolean            @default(false) @map("is_disqualified")
+  disqualifiedAt        DateTime?          @map("disqualified_at")
+  disqualifiedReason    String?            @map("disqualified_reason")
+  profilePhoto          String?            @map("profile_photo") @db.VarChar(500)
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  sellerProfile         SellerProfile?
+  buyerProfile          BuyerProfile?
+  wallet                Wallet?
+  demands               Demand[]           @relation("BuyerDemands")
+  sellerOrders          Order[]            @relation("SellerOrders")
+  buyerOrders           Order[]            @relation("BuyerOrders")
+  sellerRatings         Rating[]            @relation("SellerRatings")
+  buyerRatings          Rating[]            @relation("BuyerRatings")
+  tickets               SupportTicket[]
+  walletTransactions    WalletTransaction[]
+  notifications         SellerNotification[]
+
+  @@map("users")
+}
+
+model SellerProfile {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  farmSizeAcres  Decimal? @map("farm_size_acres") @db.Decimal(8, 2)
+  cropsGrown     String[] @default([]) @map("crops_grown")
+  ussdPin        String?  @map("ussd_pin") @db.VarChar(100)
+  canUseUssd     Boolean  @default(true) @map("can_use_ussd")
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("seller_profiles")
+}
+
+model BuyerProfile {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @unique @map("user_id") @db.Uuid
+  businessName     String?   @map("business_name") @db.VarChar(150)
+  businessType     String?   @map("business_type") @db.VarChar(50)
+  deliveryLocation String?   @map("delivery_location")
+  interviewNotes   String?   @map("interview_notes")
+  interviewDate    DateTime? @map("interview_date") @db.Date
+  createdAt        DateTime  @default(now()) @map("created_at")
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("buyer_profiles")
+}
+
+model AdminUser {
+  id           String    @id @default(uuid()) @db.Uuid
+  fullName     String    @map("full_name") @db.VarChar(100)
+  email        String    @unique @db.VarChar(150)
+  phone        String?   @db.VarChar(15)
+  passwordHash String    @map("password_hash")
+  totpSecret   String?   @map("totp_secret")
+  role         AdminRole
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLogin    DateTime? @map("last_login")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  prices       CropPrice[]
+  tickets      SupportTicket[]
+
+  @@map("admin_users")
+}
+
+model Crop {
+  id             String              @id @default(uuid()) @db.Uuid
+  name           String              @db.VarChar(100)
+  nameSwahili    String?             @map("name_swahili") @db.VarChar(100)
+  category       String?             @db.VarChar(50)
+  unit           String              @default("kg") @db.VarChar(20)
+  description    String?
+  imageUrl       String?             @map("image_url") @db.VarChar(500)
+  isActive       Boolean             @default(true) @map("is_active")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  prices         CropPrice[]
+  demands        Demand[]
+  orders         Order[]
+  deliveryWindow CropDeliveryWindow?
+
+  @@map("crops")
+}
+
+model CropPrice {
+  id            String    @id @default(uuid()) @db.Uuid
+  cropId        String    @map("crop_id") @db.Uuid
+  region        String    @default("Dodoma") @db.VarChar(50)
+  pricePerUnit  Decimal   @map("price_per_unit") @db.Decimal(12, 2)
+  unit          String    @default("kg") @db.VarChar(20)
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  setBy         String?   @map("set_by") @db.Uuid
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  crop          Crop      @relation(fields: [cropId], references: [id])
+  admin         AdminUser? @relation(fields: [setBy], references: [id])
+
+  @@index([cropId, region, effectiveTo])
+  @@map("crop_prices")
+}
+
+model CropDeliveryWindow {
+  id        String   @id @default(uuid()) @db.Uuid
+  cropId    String   @unique @map("crop_id") @db.Uuid
+  hours     Int      @default(48)
+  createdAt DateTime @default(now()) @map("created_at")
+  crop      Crop     @relation(fields: [cropId], references: [id])
+
+  @@map("crop_delivery_windows")
+}
+
+model Demand {
+  id                  String       @id @default(uuid()) @db.Uuid
+  buyerId             String       @map("buyer_id") @db.Uuid
+  cropId              String       @map("crop_id") @db.Uuid
+  region              String       @default("Dodoma") @db.VarChar(50)
+  quantityKg          Decimal      @map("quantity_kg") @db.Decimal(12, 2)
+  quantityFulfilled   Decimal      @default(0) @map("quantity_fulfilled") @db.Decimal(12, 2)
+  pricePerKg          Decimal      @map("price_per_kg") @db.Decimal(12, 2)
+  totalValue          Decimal      @map("total_value") @db.Decimal(14, 2)
+  deliveryLocation    String       @map("delivery_location")
+  deliveryDeadline    DateTime     @map("delivery_deadline") @db.Date
+  status              DemandStatus @default(open)
+  notes               String?
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+  buyer               User         @relation("BuyerDemands", fields: [buyerId], references: [id])
+  crop                Crop         @relation(fields: [cropId], references: [id])
+  orders              Order[]
+  notifications       SellerNotification[]
+
+  @@index([status, region, cropId])
+  @@map("demands")
+}
+
+model Order {
+  id                 String      @id @default(uuid()) @db.Uuid
+  demandId           String      @map("demand_id") @db.Uuid
+  sellerId           String      @map("seller_id") @db.Uuid
+  buyerId            String      @map("buyer_id") @db.Uuid
+  cropId             String      @map("crop_id") @db.Uuid
+  quantityKg         Decimal     @map("quantity_kg") @db.Decimal(12, 2)
+  pricePerKg         Decimal     @map("price_per_kg") @db.Decimal(12, 2)
+  totalAmount        Decimal     @map("total_amount") @db.Decimal(14, 2)
+  commissionRate     Decimal     @map("commission_rate") @db.Decimal(5, 4)
+  commissionAmount   Decimal?    @map("commission_amount") @db.Decimal(14, 2)
+  sellerPayout       Decimal?    @map("seller_payout") @db.Decimal(14, 2)
+  status             OrderStatus @default(committed)
+  committedAt        DateTime    @default(now()) @map("committed_at")
+  expiryAt           DateTime    @map("expiry_at")
+  deliveredAt        DateTime?   @map("delivered_at")
+  confirmedAt        DateTime?   @map("confirmed_at")
+  paidAt             DateTime?   @map("paid_at")
+  deliveryNotes      String?     @map("delivery_notes")
+  deliveryPhotoUrl   String?     @map("delivery_photo_url")
+  cancellationReason String?     @map("cancellation_reason")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  demand             Demand      @relation(fields: [demandId], references: [id])
+  seller             User        @relation("SellerOrders", fields: [sellerId], references: [id])
+  buyer              User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  crop               Crop        @relation(fields: [cropId], references: [id])
+  transactions       WalletTransaction[]
+  rating             Rating?
+  platformTransaction PlatformTransaction?
+
+  @@unique([sellerId, demandId])
+  @@index([status, expiryAt])
+  @@map("orders")
+}
+
+model Wallet {
+  id            String              @id @default(uuid()) @db.Uuid
+  userId        String              @unique @map("user_id") @db.Uuid
+  balance       Decimal             @default(0) @db.Decimal(14, 2)
+  lockedBalance Decimal             @default(0) @map("locked_balance") @db.Decimal(14, 2)
+  currency      String              @default("TZS") @db.VarChar(5)
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id            String            @id @default(uuid()) @db.Uuid
+  walletId      String            @map("wallet_id") @db.Uuid
+  userId        String            @map("user_id") @db.Uuid
+  type          TransactionType
+  amount        Decimal           @db.Decimal(14, 2)
+  balanceBefore Decimal           @map("balance_before") @db.Decimal(14, 2)
+  balanceAfter  Decimal           @map("balance_after") @db.Decimal(14, 2)
+  reference     String?           @unique @db.VarChar(100)
+  description   String?
+  orderId       String?           @map("order_id") @db.Uuid
+  status        TransactionStatus @default(completed)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  wallet        Wallet            @relation(fields: [walletId], references: [id])
+  user          User              @relation(fields: [userId], references: [id])
+  order         Order?            @relation(fields: [orderId], references: [id])
+
+  @@index([userId, createdAt])
+  @@map("wallet_transactions")
+}
+
+model PlatformWallet {
+  id        String   @id @default("00000000-0000-0000-0000-000000000001") @db.Uuid
+  balance   Decimal  @default(0) @db.Decimal(16, 2)
+  currency  String   @default("TZS") @db.VarChar(5)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_wallet")
+}
+
+model PlatformTransaction {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String   @unique @map("order_id") @db.Uuid
+  amount    Decimal  @db.Decimal(14, 2)
+  type      String   @default("commission") @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at")
+  order     Order    @relation(fields: [orderId], references: [id])
+
+  @@map("platform_transactions")
+}
+
+model Rating {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String   @unique @map("order_id") @db.Uuid
+  sellerId  String   @map("seller_id") @db.Uuid
+  buyerId   String   @map("buyer_id") @db.Uuid
+  score     Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  order     Order    @relation(fields: [orderId], references: [id])
+  seller    User     @relation("SellerRatings", fields: [sellerId], references: [id])
+  buyer     User     @relation("BuyerRatings", fields: [buyerId], references: [id])
+
+  @@map("ratings")
+}
+
+model SellerNotification {
+  id        String   @id @default(uuid()) @db.Uuid
+  sellerId  String   @map("seller_id") @db.Uuid
+  demandId  String   @map("demand_id") @db.Uuid
+  type      String   @default("sms") @db.VarChar(20)
+  message   String
+  sentAt    DateTime @default(now()) @map("sent_at")
+  delivered Boolean  @default(false)
+  seller    User     @relation(fields: [sellerId], references: [id])
+  demand    Demand   @relation(fields: [demandId], references: [id])
+
+  @@map("seller_notifications")
+}
+
+model SmsLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  recipient     String   @db.VarChar(15)
+  message       String
+  beemRequestId String?  @map("beem_request_id") @db.VarChar(100)
+  status        String   @default("sent") @db.VarChar(20)
+  retryCount    Int      @default(0) @map("retry_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("sms_logs")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorId      String?  @map("actor_id") @db.Uuid
+  actorType    String?  @map("actor_type") @db.VarChar(20)
+  action       String   @db.VarChar(100)
+  resourceType String?  @map("resource_type") @db.VarChar(50)
+  resourceId   String?  @map("resource_id") @db.Uuid
+  oldValue     Json?    @map("old_value")
+  newValue     Json?    @map("new_value")
+  ipAddress    String?  @map("ip_address") @db.Inet
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+model SupportTicket {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  assignedTo  String?        @map("assigned_to") @db.Uuid
+  subject     String         @db.VarChar(200)
+  description String
+  status      TicketStatus   @default(open)
+  priority    TicketPriority @default(normal)
+  resolution  String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  user        User           @relation(fields: [userId], references: [id])
+  admin       AdminUser?     @relation(fields: [assignedTo], references: [id])
+
+  @@map("support_tickets")
+}
+
+model CommissionSetting {
+  id            String   @id @default(uuid()) @db.Uuid
+  rate          Decimal  @default(0.05) @db.Decimal(5, 4)
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  setBy         String?  @map("set_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("commission_settings")
+}
+
+model PlatformSetting {
+  key         String   @id @db.VarChar(100)
+  value       String
+  description String?
+  updatedBy   String?  @map("updated_by") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
