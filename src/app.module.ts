@@ -17,10 +17,11 @@ import { SupportModule } from './support/support.module';
 import { UsersModule } from './users/users.module';
 import { UssdModule } from './ussd/ussd.module';
 import { WalletModule } from './wallet/wallet.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true }), ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]), ScheduleModule.forRoot(), InfrastructureModule, AuthModule, UsersModule, MarketModule, OrdersModule, WalletModule, RatingsModule, SupportModule, AdminModule, UssdModule, JobsModule],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
 })
 export class AppModule {}

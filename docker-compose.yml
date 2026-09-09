@@ -2,10 +2,25 @@ services:
   api:
     build: .
     env_file: .env
-    ports: ["3111:3111"]
+    environment:
+      PORT: ${API_PORT:-3111}
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://mkulima:mkulima@postgres:5432/mkulima_link?schema=public}
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://redis:6379}
+    ports: ["${API_PORT:-3111}:${API_PORT:-3111}"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+  migrate:
+    build:
+      context: .
+      target: build
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://mkulima:mkulima@postgres:5432/mkulima_link?schema=public}
+    command: sh -c "npm run prisma:deploy && npm run prisma:seed"
     depends_on:
       postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
+    restart: "no"
   postgres:
     image: postgres:15-alpine
     environment:
