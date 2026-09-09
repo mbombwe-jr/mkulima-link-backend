@@ -4,13 +4,14 @@ import { AuthUser } from '../common/auth.types';
 import { pageArgs } from '../common/dto';
 import { PrismaService } from '../infrastructure/prisma.service';
 import { ProvidersService } from '../infrastructure/providers.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateDemandDto, DemandQueryDto } from './market.dto';
 
 const demandInclude = { crop: true, orders: { select: { id: true, sellerId: true, quantityKg: true, status: true, expiryAt: true } } } as const;
 
 @Injectable()
 export class MarketService {
-  constructor(private prisma: PrismaService, private providers: ProvidersService) {}
+  constructor(private prisma: PrismaService, private providers: ProvidersService, private notifications: NotificationsService) {}
 
   prices(cropId?: string) {
     return this.prisma.cropPrice.findMany({ where: { cropId, effectiveTo: null, crop: { isActive: true } }, include: { crop: { include: { deliveryWindow: true } } }, orderBy: { crop: { name: 'asc' } } });
@@ -69,7 +70,10 @@ export class MarketService {
     await Promise.all(sellers.map(async seller => {
       const message = `Mkulima Link: Mnunuzi anataka ${quantity}kg ya ${crop} @ TZS ${price}/kg. Angalia *152# au app.`;
       await this.prisma.sellerNotification.create({ data: { sellerId: seller.id, demandId, message } });
-      await this.providers.sendSms(seller.phone, message);
+      await Promise.all([
+        this.providers.sendSms(seller.phone, message),
+        this.notifications.notifyUser(seller.id, 'Hitaji jipya la mazao', message, { type: 'new_demand', demandId }),
+      ]);
     }));
   }
 }

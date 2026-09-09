@@ -11,16 +11,19 @@ enum UserRole {
   seller
   buyer
 }
+
 enum AdminRole {
   super_admin
   helpdesk
 }
+
 enum VerificationStatus {
   pending
   approved
   rejected
   suspended
 }
+
 enum DemandStatus {
   open
   partially_filled
@@ -28,6 +31,7 @@ enum DemandStatus {
   expired
   cancelled
 }
+
 enum OrderStatus {
   committed
   delivered
@@ -37,6 +41,7 @@ enum OrderStatus {
   cancelled
   disputed
 }
+
 enum TransactionType {
   topup
   lock
@@ -47,18 +52,21 @@ enum TransactionType {
   withdrawal
   refund
 }
+
 enum TransactionStatus {
   pending
   completed
   failed
   reversed
 }
+
 enum TicketStatus {
   open
   in_progress
   resolved
   closed
 }
+
 enum TicketPriority {
   low
   normal
@@ -66,53 +74,60 @@ enum TicketPriority {
   urgent
 }
 
+enum DevicePlatform {
+  android
+  ios
+}
+
 model User {
-  id                    String             @id @default(uuid()) @db.Uuid
-  phone                 String             @unique @db.VarChar(15)
-  fullName              String             @map("full_name") @db.VarChar(100)
-  role                  UserRole
-  region                String             @default("Dodoma") @db.VarChar(50)
-  district              String?            @db.VarChar(50)
-  ward                  String?            @db.VarChar(50)
-  village               String?            @db.VarChar(100)
-  isActive              Boolean            @default(true) @map("is_active")
-  isVerified            Boolean            @default(false) @map("is_verified")
-  verificationStatus    VerificationStatus @default(pending) @map("verification_status")
-  verifiedBy            String?            @map("verified_by") @db.Uuid
-  verifiedAt            DateTime?          @map("verified_at")
-  rejectionReason       String?            @map("rejection_reason")
-  rating                Decimal            @default(5) @db.Decimal(3, 2)
-  totalRatings          Int                @default(0) @map("total_ratings")
-  isDisqualified        Boolean            @default(false) @map("is_disqualified")
-  disqualifiedAt        DateTime?          @map("disqualified_at")
-  disqualifiedReason    String?            @map("disqualified_reason")
-  profilePhoto          String?            @map("profile_photo") @db.VarChar(500)
-  createdAt             DateTime           @default(now()) @map("created_at")
-  updatedAt             DateTime           @updatedAt @map("updated_at")
-  sellerProfile         SellerProfile?
-  buyerProfile          BuyerProfile?
-  wallet                Wallet?
-  demands               Demand[]           @relation("BuyerDemands")
-  sellerOrders          Order[]            @relation("SellerOrders")
-  buyerOrders           Order[]            @relation("BuyerOrders")
-  sellerRatings         Rating[]            @relation("SellerRatings")
-  buyerRatings          Rating[]            @relation("BuyerRatings")
-  tickets               SupportTicket[]
-  walletTransactions    WalletTransaction[]
-  notifications         SellerNotification[]
+  id                  String               @id @default(uuid()) @db.Uuid
+  phone               String               @unique @db.VarChar(15)
+  fullName            String               @map("full_name") @db.VarChar(100)
+  role                UserRole
+  region              String               @default("Dodoma") @db.VarChar(50)
+  district            String?              @db.VarChar(50)
+  ward                String?              @db.VarChar(50)
+  village             String?              @db.VarChar(100)
+  isActive            Boolean              @default(true) @map("is_active")
+  isVerified          Boolean              @default(false) @map("is_verified")
+  verificationStatus  VerificationStatus   @default(pending) @map("verification_status")
+  verifiedBy          String?              @map("verified_by") @db.Uuid
+  verifiedAt          DateTime?            @map("verified_at")
+  rejectionReason     String?              @map("rejection_reason")
+  rating              Decimal              @default(5) @db.Decimal(3, 2)
+  totalRatings        Int                  @default(0) @map("total_ratings")
+  isDisqualified      Boolean              @default(false) @map("is_disqualified")
+  disqualifiedAt      DateTime?            @map("disqualified_at")
+  disqualifiedReason  String?              @map("disqualified_reason")
+  profilePhoto        String?              @map("profile_photo") @db.VarChar(500)
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  sellerProfile       SellerProfile?
+  buyerProfile        BuyerProfile?
+  wallet              Wallet?
+  demands             Demand[]             @relation("BuyerDemands")
+  sellerOrders        Order[]              @relation("SellerOrders")
+  buyerOrders         Order[]              @relation("BuyerOrders")
+  sellerRatings       Rating[]             @relation("SellerRatings")
+  buyerRatings        Rating[]             @relation("BuyerRatings")
+  tickets             SupportTicket[]
+  walletTransactions  WalletTransaction[]
+  sellerNotifications SellerNotification[]
+  deviceTokens        DeviceToken[]
+  notifications       Notification[]
 
   @@map("users")
 }
 
 model SellerProfile {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String   @unique @map("user_id") @db.Uuid
-  farmSizeAcres  Decimal? @map("farm_size_acres") @db.Decimal(8, 2)
-  cropsGrown     String[] @default([]) @map("crops_grown")
-  ussdPin        String?  @map("ussd_pin") @db.VarChar(100)
-  canUseUssd     Boolean  @default(true) @map("can_use_ussd")
-  createdAt      DateTime @default(now()) @map("created_at")
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique @map("user_id") @db.Uuid
+  farmSizeAcres Decimal? @map("farm_size_acres") @db.Decimal(8, 2)
+  cropsGrown    String[] @default([]) @map("crops_grown")
+  ussdPin       String?  @map("ussd_pin") @db.VarChar(100)
+  canUseUssd    Boolean  @default(true) @map("can_use_ussd")
+  createdAt     DateTime @default(now()) @map("created_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("seller_profiles")
 }
@@ -132,16 +147,16 @@ model BuyerProfile {
 }
 
 model AdminUser {
-  id           String    @id @default(uuid()) @db.Uuid
-  fullName     String    @map("full_name") @db.VarChar(100)
-  email        String    @unique @db.VarChar(150)
-  phone        String?   @db.VarChar(15)
-  passwordHash String    @map("password_hash")
-  totpSecret   String?   @map("totp_secret")
+  id           String          @id @default(uuid()) @db.Uuid
+  fullName     String          @map("full_name") @db.VarChar(100)
+  email        String          @unique @db.VarChar(150)
+  phone        String?         @db.VarChar(15)
+  passwordHash String          @map("password_hash")
+  totpSecret   String?         @map("totp_secret")
   role         AdminRole
-  isActive     Boolean   @default(true) @map("is_active")
-  lastLogin    DateTime? @map("last_login")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  isActive     Boolean         @default(true) @map("is_active")
+  lastLogin    DateTime?       @map("last_login")
+  createdAt    DateTime        @default(now()) @map("created_at")
   prices       CropPrice[]
   tickets      SupportTicket[]
 
@@ -167,17 +182,17 @@ model Crop {
 }
 
 model CropPrice {
-  id            String    @id @default(uuid()) @db.Uuid
-  cropId        String    @map("crop_id") @db.Uuid
-  region        String    @default("Dodoma") @db.VarChar(50)
-  pricePerUnit  Decimal   @map("price_per_unit") @db.Decimal(12, 2)
-  unit          String    @default("kg") @db.VarChar(20)
-  effectiveFrom DateTime  @map("effective_from") @db.Date
-  effectiveTo   DateTime? @map("effective_to") @db.Date
-  setBy         String?   @map("set_by") @db.Uuid
+  id            String     @id @default(uuid()) @db.Uuid
+  cropId        String     @map("crop_id") @db.Uuid
+  region        String     @default("Dodoma") @db.VarChar(50)
+  pricePerUnit  Decimal    @map("price_per_unit") @db.Decimal(12, 2)
+  unit          String     @default("kg") @db.VarChar(20)
+  effectiveFrom DateTime   @map("effective_from") @db.Date
+  effectiveTo   DateTime?  @map("effective_to") @db.Date
+  setBy         String?    @map("set_by") @db.Uuid
   notes         String?
-  createdAt     DateTime  @default(now()) @map("created_at")
-  crop          Crop      @relation(fields: [cropId], references: [id])
+  createdAt     DateTime   @default(now()) @map("created_at")
+  crop          Crop       @relation(fields: [cropId], references: [id])
   admin         AdminUser? @relation(fields: [setBy], references: [id])
 
   @@index([cropId, region, effectiveTo])
@@ -195,58 +210,58 @@ model CropDeliveryWindow {
 }
 
 model Demand {
-  id                  String       @id @default(uuid()) @db.Uuid
-  buyerId             String       @map("buyer_id") @db.Uuid
-  cropId              String       @map("crop_id") @db.Uuid
-  region              String       @default("Dodoma") @db.VarChar(50)
-  quantityKg          Decimal      @map("quantity_kg") @db.Decimal(12, 2)
-  quantityFulfilled   Decimal      @default(0) @map("quantity_fulfilled") @db.Decimal(12, 2)
-  pricePerKg          Decimal      @map("price_per_kg") @db.Decimal(12, 2)
-  totalValue          Decimal      @map("total_value") @db.Decimal(14, 2)
-  deliveryLocation    String       @map("delivery_location")
-  deliveryDeadline    DateTime     @map("delivery_deadline") @db.Date
-  status              DemandStatus @default(open)
-  notes               String?
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
-  buyer               User         @relation("BuyerDemands", fields: [buyerId], references: [id])
-  crop                Crop         @relation(fields: [cropId], references: [id])
-  orders              Order[]
-  notifications       SellerNotification[]
+  id                String               @id @default(uuid()) @db.Uuid
+  buyerId           String               @map("buyer_id") @db.Uuid
+  cropId            String               @map("crop_id") @db.Uuid
+  region            String               @default("Dodoma") @db.VarChar(50)
+  quantityKg        Decimal              @map("quantity_kg") @db.Decimal(12, 2)
+  quantityFulfilled Decimal              @default(0) @map("quantity_fulfilled") @db.Decimal(12, 2)
+  pricePerKg        Decimal              @map("price_per_kg") @db.Decimal(12, 2)
+  totalValue        Decimal              @map("total_value") @db.Decimal(14, 2)
+  deliveryLocation  String               @map("delivery_location")
+  deliveryDeadline  DateTime             @map("delivery_deadline") @db.Date
+  status            DemandStatus         @default(open)
+  notes             String?
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  buyer             User                 @relation("BuyerDemands", fields: [buyerId], references: [id])
+  crop              Crop                 @relation(fields: [cropId], references: [id])
+  orders            Order[]
+  notifications     SellerNotification[]
 
   @@index([status, region, cropId])
   @@map("demands")
 }
 
 model Order {
-  id                 String      @id @default(uuid()) @db.Uuid
-  demandId           String      @map("demand_id") @db.Uuid
-  sellerId           String      @map("seller_id") @db.Uuid
-  buyerId            String      @map("buyer_id") @db.Uuid
-  cropId             String      @map("crop_id") @db.Uuid
-  quantityKg         Decimal     @map("quantity_kg") @db.Decimal(12, 2)
-  pricePerKg         Decimal     @map("price_per_kg") @db.Decimal(12, 2)
-  totalAmount        Decimal     @map("total_amount") @db.Decimal(14, 2)
-  commissionRate     Decimal     @map("commission_rate") @db.Decimal(5, 4)
-  commissionAmount   Decimal?    @map("commission_amount") @db.Decimal(14, 2)
-  sellerPayout       Decimal?    @map("seller_payout") @db.Decimal(14, 2)
-  status             OrderStatus @default(committed)
-  committedAt        DateTime    @default(now()) @map("committed_at")
-  expiryAt           DateTime    @map("expiry_at")
-  deliveredAt        DateTime?   @map("delivered_at")
-  confirmedAt        DateTime?   @map("confirmed_at")
-  paidAt             DateTime?   @map("paid_at")
-  deliveryNotes      String?     @map("delivery_notes")
-  deliveryPhotoUrl   String?     @map("delivery_photo_url")
-  cancellationReason String?     @map("cancellation_reason")
-  createdAt          DateTime    @default(now()) @map("created_at")
-  updatedAt          DateTime    @updatedAt @map("updated_at")
-  demand             Demand      @relation(fields: [demandId], references: [id])
-  seller             User        @relation("SellerOrders", fields: [sellerId], references: [id])
-  buyer              User        @relation("BuyerOrders", fields: [buyerId], references: [id])
-  crop               Crop        @relation(fields: [cropId], references: [id])
-  transactions       WalletTransaction[]
-  rating             Rating?
+  id                  String               @id @default(uuid()) @db.Uuid
+  demandId            String               @map("demand_id") @db.Uuid
+  sellerId            String               @map("seller_id") @db.Uuid
+  buyerId             String               @map("buyer_id") @db.Uuid
+  cropId              String               @map("crop_id") @db.Uuid
+  quantityKg          Decimal              @map("quantity_kg") @db.Decimal(12, 2)
+  pricePerKg          Decimal              @map("price_per_kg") @db.Decimal(12, 2)
+  totalAmount         Decimal              @map("total_amount") @db.Decimal(14, 2)
+  commissionRate      Decimal              @map("commission_rate") @db.Decimal(5, 4)
+  commissionAmount    Decimal?             @map("commission_amount") @db.Decimal(14, 2)
+  sellerPayout        Decimal?             @map("seller_payout") @db.Decimal(14, 2)
+  status              OrderStatus          @default(committed)
+  committedAt         DateTime             @default(now()) @map("committed_at")
+  expiryAt            DateTime             @map("expiry_at")
+  deliveredAt         DateTime?            @map("delivered_at")
+  confirmedAt         DateTime?            @map("confirmed_at")
+  paidAt              DateTime?            @map("paid_at")
+  deliveryNotes       String?              @map("delivery_notes")
+  deliveryPhotoUrl    String?              @map("delivery_photo_url")
+  cancellationReason  String?              @map("cancellation_reason")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  demand              Demand               @relation(fields: [demandId], references: [id])
+  seller              User                 @relation("SellerOrders", fields: [sellerId], references: [id])
+  buyer               User                 @relation("BuyerOrders", fields: [buyerId], references: [id])
+  crop                Crop                 @relation(fields: [cropId], references: [id])
+  transactions        WalletTransaction[]
+  rating              Rating?
   platformTransaction PlatformTransaction?
 
   @@unique([sellerId, demandId])
@@ -336,6 +351,34 @@ model SellerNotification {
   demand    Demand   @relation(fields: [demandId], references: [id])
 
   @@map("seller_notifications")
+}
+
+model DeviceToken {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  token     String         @unique @db.VarChar(4096)
+  platform  DevicePlatform
+  isActive  Boolean        @default(true) @map("is_active")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@map("device_tokens")
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  title     String    @db.VarChar(200)
+  body      String
+  data      Json      @default("{}")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
 
 model SmsLog {

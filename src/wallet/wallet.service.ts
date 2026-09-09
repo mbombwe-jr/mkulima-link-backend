@@ -4,10 +4,11 @@ import { ProvidersService } from '../infrastructure/providers.service';
 import { pageArgs } from '../common/dto';
 import { ClickPesaWebhookDto, MoneyDto, TransactionQueryDto } from './wallet.dto';
 import { randomUUID } from 'crypto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class WalletService {
-  constructor(private prisma: PrismaService, private providers: ProvidersService) {}
+  constructor(private prisma: PrismaService, private providers: ProvidersService, private notifications: NotificationsService) {}
   me(userId: string) { return this.prisma.wallet.findUniqueOrThrow({ where: { userId } }); }
   async transactions(userId: string, query: TransactionQueryDto) {
     const [data, total] = await this.prisma.$transaction([this.prisma.walletTransaction.findMany({ where: { userId }, ...pageArgs(query), orderBy: { createdAt: 'desc' } }), this.prisma.walletTransaction.count({ where: { userId } })]);
@@ -42,10 +43,10 @@ export class WalletService {
     } catch (error) { await this.process({ reference, status: 'FAILED', amount: dto.amount }); throw error; }
   }
   async process(dto: ClickPesaWebhookDto): Promise<{ status: string }> {
-    await this.prisma.$transaction(async tx => {
+    const changed = await this.prisma.$transaction(async tx => {
       const record = await tx.walletTransaction.findUnique({ where: { reference: dto.reference }, include: { wallet: true } });
       if (!record) throw new NotFoundException('Payment reference not found');
-      if (record.status !== 'pending') return;
+      if (record.status !== 'pending') return null;
       if (Number(record.amount) !== Number(dto.amount)) throw new UnprocessableEntityException('Webhook amount mismatch');
       if (dto.status === 'SUCCESS' && dto.reference.startsWith('TOPUP-')) {
         await tx.wallet.update({ where: { id: record.walletId }, data: { balance: { increment: record.amount } } });
@@ -55,7 +56,13 @@ export class WalletService {
         if (dto.reference.startsWith('WITHDRAW-')) await tx.wallet.update({ where: { id: record.walletId }, data: { balance: { increment: record.amount } } });
         await tx.walletTransaction.update({ where: { id: record.id }, data: { status: 'failed', balanceAfter: dto.reference.startsWith('WITHDRAW-') ? Number(record.wallet.balance) + Number(record.amount) : record.balanceAfter } });
       }
+      return { userId: record.userId, topup: dto.reference.startsWith('TOPUP-'), success: dto.status === 'SUCCESS', amount: Number(record.amount) };
     });
+    if (changed) {
+      const title = changed.success ? (changed.topup ? 'Salio limeongezwa' : 'Fedha zimetumwa') : 'Muamala umeshindikana';
+      const body = changed.success ? `Muamala wa TZS ${changed.amount} umekamilika.` : `Muamala wa TZS ${changed.amount} haukukamilika.`;
+      await this.notifications.notifyUser(changed.userId, title, body, { type: changed.topup ? 'wallet_topup' : 'wallet_withdrawal', reference: dto.reference });
+    }
     return { status: 'received' };
   }
 }

@@ -5,3 +5,32 @@ coverage/
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# Flutter generated output and local tooling
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/build/
+apps/mobile/coverage/
+apps/mobile/.idea/
+apps/mobile/**/*.iml
+apps/mobile/ios/Flutter/ephemeral/
+apps/mobile/ios/Pods/
+apps/mobile/ios/.symlinks/
+apps/mobile/android/local.properties
+
+# Mobile signing and secret material (google-services.json is intentionally tracked)
+apps/mobile/android/key.properties
+apps/mobile/**/*.jks
+apps/mobile/**/*.keystore
+apps/mobile/**/*.p12
+apps/mobile/**/*.mobileprovision
+apps/mobile/ios/Runner/GoogleService-Info.plist
+**/*service-account*.json
+**/*service_account*.json
+**/firebase-admin*.json
+**/*firebase-adminsdk*.json
+**/*adminsdk*.json
+apps/mobile/**/*.apk
+apps/mobile/**/*.aab
+apps/mobile/**/*.ipa
+apps/mobile/ios/DerivedData/

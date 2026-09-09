@@ -18,9 +18,10 @@ import { UsersModule } from './users/users.module';
 import { UssdModule } from './ussd/ussd.module';
 import { WalletModule } from './wallet/wallet.module';
 import { HealthController } from './health/health.controller';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]), ScheduleModule.forRoot(), InfrastructureModule, AuthModule, UsersModule, MarketModule, OrdersModule, WalletModule, RatingsModule, SupportModule, AdminModule, UssdModule, JobsModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]), ScheduleModule.forRoot(), InfrastructureModule, AuthModule, UsersModule, MarketModule, OrdersModule, WalletModule, RatingsModule, SupportModule, AdminModule, UssdModule, JobsModule, NotificationsModule],
   controllers: [AppController, HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
 })

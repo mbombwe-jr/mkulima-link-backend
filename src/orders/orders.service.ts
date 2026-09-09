@@ -4,13 +4,14 @@ import { AuthUser } from '../common/auth.types';
 import { pageArgs } from '../common/dto';
 import { PrismaService } from '../infrastructure/prisma.service';
 import { ProvidersService } from '../infrastructure/providers.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CommitOrderDto, DeliverOrderDto, OrderQueryDto } from './orders.dto';
 
 const include = { crop: true, demand: true, seller: { select: { id: true, fullName: true, rating: true } }, buyer: { select: { id: true, fullName: true, buyerProfile: true } }, rating: true } as const;
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService, private providers: ProvidersService) {}
+  constructor(private prisma: PrismaService, private providers: ProvidersService, private notifications: NotificationsService) {}
 
   async commit(user: AuthUser, dto: CommitOrderDto) {
     if (user.isDisqualified) throw new ForbiddenException('Seller is disqualified');
@@ -44,6 +45,8 @@ export class OrdersService {
       await Promise.all([
         this.providers.sendSms((await this.prisma.user.findUniqueOrThrow({ where: { id: order.sellerId } })).phone, `Umefanikiwa kukubali oda ya ${order.quantityKg}kg ya ${order.crop.name}. Toa ifikapo ${order.expiryAt.toISOString()}.`),
         this.providers.sendSms((await this.prisma.user.findUniqueOrThrow({ where: { id: order.buyerId } })).phone, `Muuzaji amekubali kutoa ${order.quantityKg}kg ya ${order.crop.name}.`),
+        this.notifications.notifyUser(order.sellerId, 'Oda imekubaliwa', `Toa ${order.quantityKg}kg ya ${order.crop.name} ifikapo ${order.expiryAt.toISOString()}.`, { type: 'order_committed', orderId: order.id }),
+        this.notifications.notifyUser(order.buyerId, 'Muuzaji amepatikana', `Muuzaji amekubali kutoa ${order.quantityKg}kg ya ${order.crop.name}.`, { type: 'order_committed', orderId: order.id }),
       ]);
       return order;
     } catch (error) {
@@ -72,14 +75,15 @@ export class OrdersService {
     const updated = await this.prisma.order.update({ where: { id }, data: { status: 'delivered', deliveredAt: new Date(), ...dto }, include });
     const buyer = await this.prisma.user.findUniqueOrThrow({ where: { id: order.buyerId } });
     await this.providers.sendSms(buyer.phone, 'Muuzaji anasema ametoa. Thibisha mapokezi kwenye app.');
+    await this.notifications.notifyUser(order.buyerId, 'Mzigo umefikishwa', 'Muuzaji ameweka mzigo kama umefikishwa. Thibitisha mapokezi kwenye app.', { type: 'order_delivered', orderId: order.id });
     return updated;
   }
 
   async confirm(id: string, buyerId: string) {
-    return this.prisma.$transaction(async tx => {
+    const result = await this.prisma.$transaction(async tx => {
       const order = await tx.order.findFirst({ where: { id, buyerId }, include: { buyer: { include: { wallet: true } }, seller: { include: { wallet: true } } } });
       if (!order) throw new NotFoundException('Order not found');
-      if (order.status === 'paid') return order;
+      if (order.status === 'paid') return { order, changed: false as const };
       if (order.status !== 'delivered') throw new ConflictException('Only delivered orders can be confirmed');
       const buyerWallet = order.buyer.wallet; const sellerWallet = order.seller.wallet;
       if (!buyerWallet || !sellerWallet) throw new UnprocessableEntityException('Wallet is unavailable');
@@ -93,8 +97,13 @@ export class OrdersService {
       ] });
       await tx.platformWallet.upsert({ where: { id: '00000000-0000-0000-0000-000000000001' }, create: { balance: commission }, update: { balance: { increment: commission } } });
       await tx.platformTransaction.create({ data: { orderId: id, amount: commission } });
-      return tx.order.update({ where: { id }, data: { status: 'paid', confirmedAt: new Date(), paidAt: new Date(), commissionAmount: commission, sellerPayout: payout }, include });
+      const paid = await tx.order.update({ where: { id }, data: { status: 'paid', confirmedAt: new Date(), paidAt: new Date(), commissionAmount: commission, sellerPayout: payout }, include });
+      return { order: paid, changed: true as const };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    if (result.changed) {
+      await this.notifications.notifyUser(result.order.sellerId, 'Malipo yameingia', `Umelipwa TZS ${result.order.sellerPayout} kwa oda yako.`, { type: 'order_paid', orderId: id });
+    }
+    return result.order;
   }
 
   async expire(id: string): Promise<void> {

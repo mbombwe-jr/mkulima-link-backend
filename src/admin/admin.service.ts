@@ -5,11 +5,12 @@ import { pageArgs } from '../common/dto';
 import { PrismaService } from '../infrastructure/prisma.service';
 import { ProvidersService } from '../infrastructure/providers.service';
 import { OrdersService } from '../orders/orders.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ApprovalDto, AdminCreateDto, AdminQueryDto, CommissionDto, CropDto, OverrideDto, PriceDto, ReasonDto, SettingDto } from './admin.dto';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService, private providers: ProvidersService, private ordersService: OrdersService) {}
+  constructor(private prisma: PrismaService, private providers: ProvidersService, private ordersService: OrdersService, private notifications: NotificationsService) {}
   pending(query: AdminQueryDto) { return this.prisma.user.findMany({ where: { role: 'buyer', verificationStatus: 'pending' }, include: { buyerProfile: true }, ...pageArgs(query), orderBy: { createdAt: 'asc' } }); }
   users(role: 'buyer' | 'seller', query: AdminQueryDto) { return this.prisma.user.findMany({ where: { role, ...(query.status ? { verificationStatus: query.status as any } : {}), ...(query.search ? { OR: [{ fullName: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search } }] } : {}) }, include: { buyerProfile: true, sellerProfile: true, wallet: true }, ...pageArgs(query), orderBy: { createdAt: 'desc' } }); }
   async approve(id: string, admin: AuthUser, dto: ApprovalDto) {
@@ -20,12 +21,15 @@ export class AdminService {
       const updated = await tx.user.update({ where: { id }, data: { isVerified: true, isActive: true, verificationStatus: 'approved', verifiedBy: admin.sub, verifiedAt: new Date(), rejectionReason: null } });
       await this.auditTx(tx, admin, 'buyer_approved', 'user', id, dto); return updated;
     });
-    await this.providers.sendSms(user.phone, `Hongera ${user.fullName}! Akaunti yako imeidhinishwa.`); return user;
+    await Promise.all([
+      this.providers.sendSms(user.phone, `Hongera ${user.fullName}! Akaunti yako imeidhinishwa.`),
+      this.notifications.notifyUser(user.id, 'Akaunti imeidhinishwa', 'Sasa unaweza kuweka mahitaji ya mazao.', { type: 'buyer_approved' }),
+    ]); return user;
   }
-  async reject(id: string, admin: AuthUser, dto: ReasonDto) { return this.changeUser(id, admin, { isVerified: false, verificationStatus: 'rejected', rejectionReason: dto.reason }, 'buyer_rejected'); }
-  async suspend(id: string, admin: AuthUser, dto: ReasonDto) { return this.changeUser(id, admin, { isActive: false, verificationStatus: 'suspended', rejectionReason: dto.reason }, 'user_suspended'); }
-  async reinstate(id: string, admin: AuthUser) { const user = await this.prisma.user.findUniqueOrThrow({ where: { id } }); return this.changeUser(id, admin, { isActive: true, verificationStatus: user.role === 'seller' ? 'approved' : 'approved', isVerified: true, rejectionReason: null }, 'user_reinstated'); }
-  async requalify(id: string, admin: AuthUser, dto: ReasonDto) { return this.changeUser(id, admin, { isDisqualified: false, disqualifiedAt: null, disqualifiedReason: null }, 'seller_requalified', dto.reason); }
+  async reject(id: string, admin: AuthUser, dto: ReasonDto) { const user = await this.changeUser(id, admin, { isVerified: false, verificationStatus: 'rejected', rejectionReason: dto.reason }, 'buyer_rejected'); await this.notifications.notifyUser(id, 'Ombi halijaidhinishwa', `Sababu: ${dto.reason}`, { type: 'buyer_rejected' }); return user; }
+  async suspend(id: string, admin: AuthUser, dto: ReasonDto) { const user = await this.changeUser(id, admin, { isActive: false, verificationStatus: 'suspended', rejectionReason: dto.reason }, 'user_suspended'); await this.notifications.notifyUser(id, 'Akaunti imesimamishwa', dto.reason, { type: 'user_suspended' }); return user; }
+  async reinstate(id: string, admin: AuthUser) { const user = await this.changeUser(id, admin, { isActive: true, verificationStatus: 'approved', isVerified: true, rejectionReason: null }, 'user_reinstated'); await this.notifications.notifyUser(id, 'Akaunti imerejeshwa', 'Unaweza kuendelea kutumia Mkulima Link.', { type: 'user_reinstated' }); return user; }
+  async requalify(id: string, admin: AuthUser, dto: ReasonDto) { const user = await this.changeUser(id, admin, { isDisqualified: false, disqualifiedAt: null, disqualifiedReason: null }, 'seller_requalified', dto.reason); await this.notifications.notifyUser(id, 'Akaunti imefunguliwa tena', 'Unaweza kukubali oda mpya.', { type: 'seller_requalified' }); return user; }
   async createCrop(admin: AuthUser, dto: CropDto) { const { deliveryWindowHours, ...data } = dto; const crop = await this.prisma.crop.create({ data: { ...data, deliveryWindow: { create: { hours: deliveryWindowHours ?? 48 } } }, include: { deliveryWindow: true } }); await this.audit(admin, 'crop_created', 'crop', crop.id, dto); return crop; }
   async updateCrop(id: string, admin: AuthUser, dto: CropDto) { const { deliveryWindowHours, ...data } = dto; const crop = await this.prisma.crop.update({ where: { id }, data: { ...data, ...(deliveryWindowHours ? { deliveryWindow: { upsert: { create: { hours: deliveryWindowHours }, update: { hours: deliveryWindowHours } } } } : {}) }, include: { deliveryWindow: true } }); await this.audit(admin, 'crop_updated', 'crop', id, dto); return crop; }
   crops() { return this.prisma.crop.findMany({ include: { deliveryWindow: true, prices: { where: { effectiveTo: null } } }, orderBy: { name: 'asc' } }); }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "274109137118",
+    "project_id": "mkulima-link-91807",
+    "storage_bucket": "mkulima-link-91807.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:274109137118:android:9220edad1a751a2a48c24f",
+        "android_client_info": {
+          "package_name": "tz.mkulima.mkulima_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBTEfyJYW7FTFfY8yHOorUw8_SzH9-vhQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
